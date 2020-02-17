@@ -10,7 +10,10 @@ library(stringr)
 library(dplyr)
 
 # Working directory
-setwd("G:\\Projecten\\Tabellenboek\\")
+setwd("G:\\Projecten\\Tabellenboek\\Jongerenmonitor12-18 2019")
+
+# Basisnaam voor output bestand
+output_name <- "JM1218_2019_tabel3_20200217"
 
 # Strings niet als factor inlezen
 options(stringsAsFactors = FALSE)
@@ -19,33 +22,38 @@ options(stringsAsFactors = FALSE)
 options(survey.lonely.psu="certainty") # Misschien adjust beter, want conservatiever?
 
 #inladen jeugdmonitor, selecteren op GGD HvB
-jm17 <- read_spss("G:\\Projecten\\Tabellenboek\\JM 0-11 2017 Brabant met weegfactoren en indicatoren.sav")
-jm17 <- jm17[jm17$GGD == 2, ]
+data_monitor <- read_spss("JM12-18 2019 HvB BZO DEF.sav")
+data <- data_monitor[data_monitor$GGD == 2, ]
 
-#### Uit te draaien variabelen inlezen en checken of ze ook in spss bestand staan
-var_df <- read.csv("varlijst.csv", header=FALSE) # Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
-if(FALSE %in% (var_df$V1 %in% names(jm17))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand') # Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
+# Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
+var_df <- read.csv("varlijst.csv", header=FALSE)
+
+# Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
+if(FALSE %in% (var_df$V1 %in% names(data))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand')
 # var_df[which(var_df$V1 %in% names(data)==FALSE),1] # Welke variabele mist?
 
 # Voor testdoeleinden
 # var_df <- data.frame(V1 = var_df[1:3,1])
 
 # Hercodeer naar dichotome variabelen
-jm17$ETNICAT_2CAT <- car::recode(jm17$ETNICAT, "1=2; 2=2; 3=1; 9=NA") #hercoderen naar dichotome variabele
-jm17$MBGSO2S1_2CAT <- car::recode(jm17$MBGSO2S1, "1=0; 2=0; 3=0; 4=1; 5=0; 9=NA") #hercoderen naar dichotome variabele
-jm17$ouderslaagmiddenopgeleid_2CAT <- car::recode(jm17$ouderslaagmiddenopgeleid, "0=0; 1=1; 8=NA; 9=NA")
+data$ETNICAT_2CAT <- car::recode(data$ETNICAT, "1=2; 2=2; 3=1; 9=NA") #hercoderen naar dichotome variabele
+data$MBGSO2S1_2CAT <- car::recode(data$MBGSO2S1, "1=0; 2=0; 3=0; 4=1; 5=0; 9=NA") #hercoderen naar dichotome variabele
+data$ouderslaagmiddenopgeleid_2CAT <- car::recode(data$ouderslaagmiddenopgeleid, "0=0; 1=1; 8=NA; 9=NA")
 
 # Zet labels goed
-jm17$ETNICAT_2CAT <- labelled(jm17$ETNICAT_2CAT, c("Niet-westerse migratieachtergrond" = 1, "Nederlandse/westerse (migratie)achtergrond" = 2))
-jm17$MBGSO2S1_2CAT <- labelled(jm17$MBGSO2S1_2CAT, c("Geen eenoudergezin" = 0, "Eenoudergezin" = 1))
-jm17$ouderslaagmiddenopgeleid_2CAT <- labelled(jm17$ouderslaagmiddenopgeleid_2CAT, c("Niet alle aanwezige ouders laag/middenpgeleid" = 0, "Alle aanwezige ouders laag/middenopgeleid" = 1))
+data$ETNICAT_2CAT <- labelled(data$ETNICAT_2CAT, c("Niet-westerse migratieachtergrond" = 1, "Nederlandse/westerse (migratie)achtergrond" = 2))
+data$MBGSO2S1_2CAT <- labelled(data$MBGSO2S1_2CAT, c("Geen eenoudergezin" = 0, "Eenoudergezin" = 1))
+data$ouderslaagmiddenopgeleid_2CAT <- labelled(data$ouderslaagmiddenopgeleid_2CAT, c("Niet alle aanwezige ouders laag/middenopgeleid" = 0, "Alle aanwezige ouders laag/middenopgeleid" = 1))
 
 
 # Crossings variabelen
 crossingvars <- c("geslacht", "leefcat", "ETNICAT_2CAT", "MBGSO2S1_2CAT", "ouderslaagmiddenopgeleid_2CAT", "buitenshuiswerkend")
 
+# Check of crossing vars idd in spss bestand staan
+if (FALSE %in%(c("geslacht", "leefcat", "etn", "opleiding", "eenoudergezin") %in% names(data))) stop ('Niet alle crossingsvariabelen staan in het SPSS bestand')
+
 # Survey design
-jm17design <- svydesign(ids = ~1, data = jm17, strata = ~wijk, weights = jm17$Wi_groot)
+datadesign <- svydesign(ids = ~1, data = data, strata = ~wijk, weights = data$Wi_groot)
 
 # Dataframe om resultaten in op te slaan
 df3 <- data.frame(gebied = character(0),
@@ -72,16 +80,16 @@ idx = 0
 for (i in var_df$V1) {
     
     # Alleen uitvoeren voor variabelen waar niet alles NA is
-    if (!all(is.na(jm17[[i]]))) {
+    if (!all(is.na(data[[i]]))) {
         
-        tb <- svytable(formula = ~ jm17[[i]] , design = jm17design) # tb bevat gewogen aantallen per waarde van de variabele
+        tb <- svytable(formula = ~ data[[i]] , design = datadesign) # tb bevat gewogen aantallen per waarde van de variabele
         ct <- prop.table(tb) # ct bevat estimates als percentages
         
-        varlabels <- attr(jm17[[i]], "labels") # value labels
+        varlabels <- attr(data[[i]], "labels") # value labels
         
         for (crossvar in crossingvars){
             
-            varlabels_cross <- attr(jm17[[crossvar]], "labels") # variabele van de crossing variabele
+            varlabels_cross <- attr(data[[crossvar]], "labels") # variabele van de crossing variabele
             
             # Voor het aantal niet-missing antwoordopties uit de vraag
             for (j in 1:length(tb)) {
@@ -89,13 +97,13 @@ for (i in var_df$V1) {
                 val <- names(tb)[j] # value labels van de variabele 
                 
                 # loopen met survey package wil niet op normale manier. Daarom glue en eval om betrouwbaarheidsintervallen te krijgen.
-                #string <- "svyby(~I({var}=={val}), ~cbsstr, jm17design, svyciprop, vartype='ci',method='xlogit', na.rm=TRUE, na.rm.all = TRUE)"
+                #string <- "svyby(~I({var}=={val}), ~cbsstr, datadesign, svyciprop, vartype='ci',method='xlogit', na.rm=TRUE, na.rm.all = TRUE)"
                 
-                string <- "svyby(~I({i}=={val}), ~{crossvar}, jm17design, svyciprop, vartype='ci',method='xlogit', level = 0.95, na.rm=TRUE)"
+                string <- "svyby(~I({i}=={val}), ~{crossvar}, datadesign, svyciprop, vartype='ci',method='xlogit', level = 0.99, na.rm=TRUE)"
                 expr <- glue(string)
                 ci_cross <- eval(parse(text = expr))
                 
-                string2 <- "svyby(~I({i}=={val}), ~{crossvar}, jm17design, svytotal, vartype='ci', method='xlogit', level = 0.95, na.rm=TRUE)"
+                string2 <- "svyby(~I({i}=={val}), ~{crossvar}, datadesign, svytotal, vartype='ci', method='xlogit', level = 0.99, na.rm=TRUE)"
                 expr2 <- glue(string2)
                 population_count <- eval(parse(text = expr2))
                 
@@ -112,7 +120,7 @@ for (i in var_df$V1) {
                     df3[idx, 5] <- varlabels_cross[k] # numerieke code van crossing variabele
                     df3[idx, 6] <- names(varlabels_cross[k]) # label horend bij unieke code van crossing variabele
                     df3[idx, 7] <- population_count[k,3] # Gewogen n
-                    df3[idx, 8] <- sum(jm17design[["variables"]][i]  == as.integer(names(tb)[j]) & jm17design[["variables"]][crossvar] == ci_cross[k,1], na.rm = TRUE) # ongewogen n
+                    df3[idx, 8] <- sum(datadesign[["variables"]][i]  == as.integer(names(tb)[j]) & datadesign[["variables"]][crossvar] == ci_cross[k,1], na.rm = TRUE) # ongewogen n
                     df3[idx, 9] <- ci_cross[k,2] # Percentage
                     df3[idx, 10] <- ci_cross[k,3] # CI lower
                     df3[idx, 11] <- ci_cross[k,4] # CI upper
@@ -121,13 +129,13 @@ for (i in var_df$V1) {
                     print(i)
                     print(names(ci_cross)[1])
                     print(varlabels_cross[k])
-                    
-                    write.csv(df3, file = "JM_tabel3_20191104_4.csv", row.names = FALSE)
-                    
+
                 }
             }
         }
     }
+    
+    write.csv(df3, file = paste0(output_name, "_tussenbestand.csv"), row.names = FALSE)
 }
 
 df3$gebied <- "Regio"
@@ -162,7 +170,6 @@ df3$koppelcode[df3$crossval == 'MBGSO2S1_2CAT1'] <- paste0(df3$varval[df3$crossv
 df3$koppelcode[df3$crossval == 'ouderslaagmiddenopgeleid_2CAT1'] <- paste0(df3$varval[df3$crossval == 'ouderslaagmiddenopgeleid_2CAT1'], 'ouderslaagmiddenopgeleid_2CAT0') # opleiding ouders; 0 = niet alle ouders laag opgeleid, 1 = alle ouders laag opgeleid
 df3$koppelcode[df3$crossval == 'buitenshuiswerkend1'] <- paste0(df3$varval[df3$crossval == 'buitenshuiswerkend1'], 'buitenshuiswerkend0') # werkende ouders; 0 = geen werkende, 1 = een of twee ouders werkend
 
-
 # Koppel tabel aan zichzelf, om gegevens op 1 rij te kunnen vergelijken
 df3_vergelijk <- dplyr::left_join(df3, df3, by = c("koppelcode" = "key"), suffix = c("_links", "_rechts"))
 
@@ -182,13 +189,13 @@ df3_vergelijk$Sign[df3_vergelijk$n_vraag_links < 30] <- "n<30"
 
 # df3_vergelijk <- read.csv('tabel3_agk_20191104_full_4.csv', header = TRUE)
 
-tabel_regio <- read.csv("tabel1_regio_full.csv", header = TRUE)
+tabel_regio <- read.csv("JM1218_2019_regio_20200217.csv", header = TRUE)
 
 tabel3 <- dplyr::full_join(df3_vergelijk, tabel_regio, by = c("varval_links" = "varval")) # suffix wordt niet toegevoegd als tabel resultaat is van join?
 # Dan maar zelf
 colnames(tabel3)[(length(colnames(df3_vergelijk))+1):length(colnames(tabel3))] <- paste0(colnames(tabel3)[(length(colnames(df3_vergelijk))+1):length(colnames(tabel3))], '_regio')
 
-write.csv(tabel3, 'tabel3_agk_20191104_full_4.csv', row.names = FALSE)
+write.csv(tabel3, file = paste0(output_name, "_def.csv"), row.names = FALSE)
 
 
 
