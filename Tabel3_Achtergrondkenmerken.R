@@ -22,9 +22,10 @@ options(survey.lonely.psu="certainty") # Misschien adjust beter, want conservati
 jm17 <- read_spss("G:\\Projecten\\Tabellenboek\\JM 0-11 2017 Brabant met weegfactoren en indicatoren.sav")
 jm17 <- jm17[jm17$GGD == 2, ]
 
-# Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
-var_df <- read.csv("G:\\Projecten\\Tabellenboek\\varlijst.csv", header=FALSE)
-FALSE %in% (var_df$V1 %in% names(jm17)) #als waarde TRUE wordt weergeven dan missen er variabelen!
+#### Uit te draaien variabelen inlezen en checken of ze ook in spss bestand staan
+var_df <- read.csv("varlijst.csv", header=FALSE) # Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
+if(FALSE %in% (var_df$V1 %in% names(jm17))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand') # Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
+# var_df[which(var_df$V1 %in% names(data)==FALSE),1] # Welke variabele mist?
 
 # Voor testdoeleinden
 # var_df <- data.frame(V1 = var_df[1:3,1])
