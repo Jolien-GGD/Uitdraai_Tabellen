@@ -1,4 +1,4 @@
-# Complex Samples in R
+# Probeersel Complex Samples in R
 
 # Clear workspace
 rm(list=ls())
@@ -21,31 +21,47 @@ library(glue)
 # Initialiseer een boel #
 #########################
 
+# Basisnaam voor output bestand
+output_name <- "JM1218_2019_tabel1_20200217"
+
 # Do not create factors from string variables
 options(stringsAsFactors = FALSE)
 
 # Strata met 1 waarneming toestaan. 
 options(survey.lonely.psu="certainty") # Misschien adjust beter, want conservatiever?
 
-# # Open databestand en sla op als Rdata
-data_jm17 <- read_spss("JM 0-11 2017 Brabant met weegfactoren en indicatoren.sav")
-data <- data_jm17[data_jm17$GGD == 2, ]
-# saveRDS(data_volw, file="Probeersel_monitor_Tabellenboek.rds") 
+# Open databestand (en sla evt op als Rdata)
+data_monitor <- read_spss("JM12-18 2019 HvB BZO DEF.sav")
 
+data <- data_monitor[data_monitor$GGD == 2, ]
+
+# Hernoem kolomnaam van Wijk naar wijk (lowercase)
+colnames(data)[colnames(data) == "Wijk"] <- "wijk"
+
+
+# Check of NA voorkomt bij gemeenten
+sum(is.na(data$cbs))
+# Proefbestand bevat lege gemeenten. Gooi deze voor gemak eruit
+# data <- data[!is.na(data$cbs),]
+
+
+# saveRDS(data_volw, file="Probeersel_monitor_Tabellenboek.rds") 
 # Open Rdata
 # data <- readRDS("Probeersel_monitor_Tabellenboek.rds")
 
-# Survey design aanmaken
-survey_design <- svydesign(ids = ~1, data = data, strata = ~wijk, weights = ~Wi_groot)
 
 #### Uit te draaien variabelen inlezen en checken of ze ook in spss bestand staan
 var_df <- read.csv("varlijst.csv", header=FALSE) # Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
 if(FALSE %in% (var_df$V1 %in% names(data))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand') # Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
 # var_df[which(var_df$V1 %in% names(data)==FALSE),1] # Welke variabele mist?
 
-
 # Voor testdoeleinden
 # var_df <- data.frame(V1 = var_df[1:50,1])
+
+
+# Survey design aanmaken
+survey_design <- svydesign(ids = ~1, data = data, strata = ~wijk, weights = ~Wi_groot)
+
 
 ###########################
 # Zonder crossings, regio #
@@ -96,12 +112,9 @@ for (varcode in var_df$V1){
       print(idx)
       print(varcode)
       
-
+      # write.csv(df_regio, file = paste0(output_name, "_regio_tussenbestand.csv", row.names = FALSE)
     }
   }  
-  
-write.csv(df_regio, file = "JM_regio_20191018.csv", row.names = FALSE)
-  
 }
 
 
@@ -121,7 +134,7 @@ df_regio$varval <- paste0(df_regio$varcode, df_regio$waarde)
 
 df_regio$sorteervariabele <- 1:nrow(df_regio)
 
-write.csv(df_regio, file = "JM_regio_20191018_full.csv", row.names = FALSE)
+write.csv(df_regio, file = paste0(output_name, "_regio_def.csv"), row.names = FALSE)
 
 
 
@@ -212,14 +225,13 @@ for (gemeente in unique(data$cbs)) {
         print(idx)
         print(gemeente)
         print(varcode)
-
+  
+        
+        # write.csv(df_gem_ci95, file = paste0(output_name, "_gem_ci95_tussenbestand.csv"), row.names = FALSE)
+        # write.csv(df_gem_ci90, file = paste0(output_name, "_gem_ci90_tussenbestand.csv"),  row.names = FALSE)
       }
     }
   }  
-  
-write.csv(df_gem_ci95, file = "JM_gem_ci95_20191018.csv", row.names = FALSE)
-write.csv(df_gem_ci90, file = "JM_gem_ci90_20191018.csv", row.names = FALSE)
-  
 }
 
 # Tel aantal geldige antwoorden per vraag op.
@@ -254,8 +266,8 @@ df_gem_ci90$cbsstr <- as.character(df_gem_ci90$gebied)
 df_gem_ci95$varval <- paste0(df_gem_ci95$varcode, df_gem_ci95$waarde)
 df_gem_ci90$varval <- paste0(df_gem_ci90$varcode, df_gem_ci90$waarde)
 
-write.csv(df_gem_ci95, file = "JM_gem_ci95_20191018_full.csv", row.names = FALSE)
-write.csv(df_gem_ci90, file = "JM_gem_ci90_20191018_full.csv", row.names = FALSE)
+write.csv(df_gem_ci95, paste0(output_name, "_gem_ci95_tussenbestand_full.csv"),  row.names = FALSE)
+write.csv(df_gem_ci90, paste0(output_name, "_gem_ci90_tussenbestand_full.csv"),  row.names = FALSE)
 
 
 ## Aan de gemeentetabel (ci 95%) wil ik de estimates, ci lowers en ci uppers van de regiotabel plakken
@@ -288,7 +300,7 @@ gem_vs_regio$Sign[gem_vs_regio$n_vraag_gem < 30] <- "n<30"
 gem_vs_regio$Sign[gem_vs_regio$percentage_gem >= 0.995 & gem_vs_regio$percentage_regio >= 0.995] <- "0"
 gem_vs_regio$Sign[gem_vs_regio$percentage_gem < 0.005 & gem_vs_regio$percentage_regio < 0.005] <- "0"
 
-write.csv(gem_vs_regio, 'tabel1_gem_vs_regio.csv', row.names = FALSE)
+write.csv(gem_vs_regio, paste0(output_name, "_gem_vs_regio_def.csv"),  row.names = FALSE)
 
 
 ################################
@@ -351,12 +363,13 @@ for (wijk in unique(data$wijk)){
         print(wijk)
         print(varcode)
         
+        
       }
     }  
   }
+  write.csv(df_wijk, file = paste0(output_name, "_wijk_tussenbestand.csv"),  row.names = FALSE)
   
- write.csv(df_wijk, file = "JM_wijk_20191018.csv", row.names = FALSE)
-}
+  }
 
 # Inlezen als sessie bovenstaande niet in 1 dag gedraaid is
 # df_wijk <- read.csv("output tabel 1/JM_wijk_Jolien_20191009.csv", header=TRUE)
@@ -379,7 +392,7 @@ df_wijk$CIupper[df_wijk$n_vraag < 30] <- NA
 df_wijk$varval <- paste0(df_wijk$varcode, df_wijk$waarde)
 
 
-write.csv(df_wijk, file = "tabel1_wijk_full.csv", row.names = FALSE)
+write.csv(df_wijk, file = paste0(output_name, "_wijk_tussenbestand_full.csv"), row.names = FALSE)
 
 
 # Koppeltabel om gemeenten bij wijken te krijgen in df_wijk
@@ -422,7 +435,7 @@ wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk >= 0.995 & wijk_vs_gem$percentage_g
 wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk < 0.005 & wijk_vs_gem$percentage_gem < 0.005] <- "0"
 
 
-write.csv(wijk_vs_gem, 'tabel1_wijk_vs_gem_20191018.csv', row.names = FALSE)
+write.csv(wijk_vs_gem, file = paste0(output_name, "wijk_vs_gem_def.csv"), row.names = FALSE)
 
 
 
