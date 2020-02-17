@@ -38,8 +38,11 @@ data <- data_jm17[data_jm17$GGD == 2, ]
 # Survey design aanmaken
 survey_design <- svydesign(ids = ~1, data = data, strata = ~wijk, weights = ~Wi_groot)
 
-#inladen lijst met de variabelen voor de tabellenboeken
-var_df <- read.csv("varlijst.csv", header=FALSE)
+#### Uit te draaien variabelen inlezen en checken of ze ook in spss bestand staan
+var_df <- read.csv("varlijst.csv", header=FALSE) # Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
+if(FALSE %in% (var_df$V1 %in% names(data))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand') # Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
+# var_df[which(var_df$V1 %in% names(data)==FALSE),1] # Welke variabele mist?
+
 
 # Voor testdoeleinden
 # var_df <- data.frame(V1 = var_df[1:50,1])
@@ -93,9 +96,12 @@ for (varcode in var_df$V1){
       print(idx)
       print(varcode)
       
-      write.csv(df_regio, file = "JM_regio_20191018.csv", row.names = FALSE)
+
     }
   }  
+  
+write.csv(df_regio, file = "JM_regio_20191018.csv", row.names = FALSE)
+  
 }
 
 
@@ -206,13 +212,14 @@ for (gemeente in unique(data$cbs)) {
         print(idx)
         print(gemeente)
         print(varcode)
-  
-        
-        write.csv(df_gem_ci95, file = "JM_gem_ci95_20191018.csv", row.names = FALSE)
-        write.csv(df_gem_ci90, file = "JM_gem_ci90_20191018.csv", row.names = FALSE)
+
       }
     }
   }  
+  
+write.csv(df_gem_ci95, file = "JM_gem_ci95_20191018.csv", row.names = FALSE)
+write.csv(df_gem_ci90, file = "JM_gem_ci90_20191018.csv", row.names = FALSE)
+  
 }
 
 # Tel aantal geldige antwoorden per vraag op.
@@ -344,11 +351,11 @@ for (wijk in unique(data$wijk)){
         print(wijk)
         print(varcode)
         
-        
-        write.csv(df_wijk, file = "JM_wijk_20191018.csv", row.names = FALSE)
       }
     }  
   }
+  
+ write.csv(df_wijk, file = "JM_wijk_20191018.csv", row.names = FALSE)
 }
 
 # Inlezen als sessie bovenstaande niet in 1 dag gedraaid is
