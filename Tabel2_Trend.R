@@ -255,9 +255,9 @@ tabel2_gem$Sign_17_08 <- 0
 
 for (i in 1:nrow(tabel2_gem) ){
     # Bij binnenste 2 if-loops mag de conditie niet uitkomen op NA. Check daarom eerst of er NAs zijn in CI. Alleen lower checken is genoeg.
-    if (!is.na(tabel2_gem[i,'CIlower_13']) & !is.na(tabel2_gem[i,'CIlower_08'])) {
-        if (tabel2_gem[i,'CIupper_13'] < tabel2_gem[i,'CIlower_08']) {tabel2_gem$Sign_17_08[i] = 1}
-        if (tabel2_gem[i,'CIlower_13'] > tabel2_gem[i,'CIupper_08']) {tabel2_gem$Sign_17_08[i] = 1}
+    if (!is.na(tabel2_gem[i,'CIlower_17']) & !is.na(tabel2_gem[i,'CIlower_08'])) {
+        if (tabel2_gem[i,'CIupper_17'] < tabel2_gem[i,'CIlower_08']) {tabel2_gem$Sign_17_08[i] = 1}
+        if (tabel2_gem[i,'CIlower_17'] > tabel2_gem[i,'CIupper_08']) {tabel2_gem$Sign_17_08[i] = 1}
     }
 }
 
