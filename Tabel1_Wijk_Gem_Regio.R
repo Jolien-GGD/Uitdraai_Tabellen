@@ -1,4 +1,4 @@
-# Probeersel Complex Samples in R
+# SPSS Complex Samples in R
 
 # Clear workspace
 rm(list=ls())
@@ -31,52 +31,71 @@ options(stringsAsFactors = FALSE)
 options(survey.lonely.psu="certainty") # Misschien adjust beter, want conservatiever?
 
 # Open databestand (en sla evt op als Rdata)
-data_monitor <- read_spss("JM12-18 2019 HvB BZO DEF.sav")
+# data_monitor <- read_spss("JM12-18 2019 HvB BZO DEF.sav")
+# saveRDS(data_monitor, file="JM12-18 2019 HvB BZO DEF.rds") 
+data_monitor <- readRDS("JM12-18 2019 HvB BZO DEF.rds")
 
+# Neem alleen data van de eigen GGD
 data <- data_monitor[data_monitor$GGD == 2, ]
 
-# Hernoem kolomnaam van Wijk naar wijk (lowercase)
+# Hernoem kolomnaam van Wijk naar wijk (lowercase, R is hoofdlettergevoelig)
 colnames(data)[colnames(data) == "Wijk"] <- "wijk"
 
+# Subsetten van het survey design werkt niet goed als de gemeente een string is. Daarom omzetting naar numeric.
+data$cbs <- as.numeric(data$cbs)
 
 # Check of NA voorkomt bij gemeenten
 sum(is.na(data$cbs))
-# Proefbestand bevat lege gemeenten. Gooi deze voor gemak eruit
-# data <- data[!is.na(data$cbs),]
-
-
-# saveRDS(data_volw, file="Probeersel_monitor_Tabellenboek.rds") 
-# Open Rdata
-# data <- readRDS("Probeersel_monitor_Tabellenboek.rds")
 
 
 #### Uit te draaien variabelen inlezen en checken of ze ook in spss bestand staan
-var_df <- read.csv("varlijst.csv", header=FALSE) # Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben
-if(FALSE %in% (var_df$V1 %in% names(data))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand') # Check of alle variabelen uit varlijst.csv ook in het sav bestand staan
-# var_df[which(var_df$V1 %in% names(data)==FALSE),1] # Welke variabele mist?
 
-# Voor testdoeleinden
+# Lees lijst in met variabelen/indicatoren die je in het tabellenboek wilt hebben. Als je bestand een kolomnaam bevat, zet dan header = TRUE. 
+# Heb je alleen een lijst met de namen van de indicatoren, zet dan header = FALSE. 
+var_df <- read.csv("varlijst.csv", header = FALSE) 
+
+# Het script verwacht dat de kolom "V1" heet. 
+colnames(var_df) <- "V1"
+
+# Check of alle variabelen uit varlijst.csv ook in het sav bestand staan. Vaak voorkomend probleem is dat de indicatoren in varlijst niet 
+# met hoofdletters op de juiste plek zijn ingegeven (R is hoofdlettergevoelig)
+if(FALSE %in% (var_df$V1 %in% names(data))) stop('Niet alle opgegeven variabelen komen voor in SPSS bestand')
+
+# Welke variabele mist?
+# var_df[which(var_df$V1 %in% names(data)==FALSE),1] 
+
+# Voor testdoeleinden: niet alle indicatoren uitdraaien, maar een deel ervan.
 # var_df <- data.frame(V1 = var_df[1:50,1])
 
-
-# Survey design aanmaken
+# Survey design aanmaken. Strata en weights zijn de variabelen die je in SPSS in de/het planfile/csaplan op zou geven.
 survey_design <- svydesign(ids = ~1, data = data, strata = ~wijk, weights = ~Wi_groot)
 
+
+### Reken vooraf uit hoeveel antwoordopties de indicatoren samen hebben. Hiermee kan vooraf de grootte van het dataframe dat de uitgerekende
+# waarden bevat worden ingesteld. Dit is sneller dan wanneer je in een loop steeds 1 regel aan een dataframe toevoegt.
+
+aantal_variable_labels <- 0
+
+for (var in var_df$V1){
+  
+  waarden <- unique(data[[var]])
+  waarden_zonder_na <- length(waarden[!is.na(waarden)])
+  
+  aantal_variable_labels <- aantal_variable_labels + waarden_zonder_na
+}
 
 ###########################
 # Zonder crossings, regio #
 ###########################
 
-### leeg df voor cijfers
-df_regio <- data.frame(varcode = character(0)
-                       , waarde = integer(0)
-                       , label = character(0)
-                       , n = integer(0)
-                       , percentage = integer(0)
-                       , CIlower = integer(0)
-                       , CIupper = integer(0)
-                       , n_unweighted = integer(0)
-                       , gebied = character(0))
+# Maak een lege dataframe aan op de resultaten in op te slaan
+df_regio = data.frame(matrix(NA, ncol = 9, nrow = aantal_variable_labels))
+
+# Pas de kolomnamen aan
+colnames(df_regio) <- c("varcode", "waarde", "label", "n", "percentage", "CIlower", "CIupper", "n_unweighted", "gebied")
+
+# Initialiseer regelnummer op 1, voor het wegschrijven van de uitgerekende data
+regelnummer <- 1
 
 for (varcode in var_df$V1){
   
@@ -97,26 +116,28 @@ for (varcode in var_df$V1){
       expr <- glue(string)
       ci <- eval(parse(text = expr)) # confidence intervals
       
-      # Schrijf info weg naar dataframe
-      idx <- nrow(df_regio) + 1
-      df_regio[idx, 1] <- varcode # variabelenaam
-      df_regio[idx, 2] <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
-      df_regio[idx, 3] <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
-      df_regio[idx, 4] <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset. 
-      df_regio[idx, 5] <- ci[[1]] # Estimate/percentage
-      df_regio[idx, 6] <- attr(ci, "ci")[1] # CI lower
-      df_regio[idx, 7] <- attr(ci, "ci")[2] # CI upper
-      df_regio[idx, 8] <- sum(survey_design[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
-      df_regio[idx, 9] <- "Regio"
+      ## Schrijf info weg naar dataframe
+      temp_varcode <- varcode # variabelenaam
+      temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
+      temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+      temp_n <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset. 
+      temp_percentage <- ci[[1]] * 100 # Estimate/percentage
+      temp_CIlower <- attr(ci, "ci")[1] * 100 # CI lower
+      temp_CIupper <- attr(ci, "ci")[2] * 100 # CI upper
+      n_unweighted <- sum(survey_design[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
+      temp_gebied <- "Regio"
       
-      print(idx)
-      print(varcode)
+      # Schrijf data weg naar dataframe
+      df_regio[regelnummer,] <- c(temp_varcode, temp_waarde, temp_label, temp_n, temp_percentage, temp_CIlower, temp_CIupper, temp_n_unweighted, temp_gebied)
       
-      # write.csv(df_regio, file = paste0(output_name, "_regio_tussenbestand.csv", row.names = FALSE)
+      # Print huidige regelnummer om idee te krijgen hoe lang script nog zal runnen
+      print(paste0(regelnummer, " van ", aantal_variable_labels))
+      
+      # Hoog regelnummer met 1 op om de volgende regel in de dataframe te vullen met de volgende indicator/antwoordoptie
+      regelnummer <- regelnummer + 1
     }
   }  
 }
-
 
 # Tel aantal geldige antwoorden per vraag op.
 df_regio <- df_regio %>%
@@ -132,9 +153,8 @@ df_regio$CIupper[df_regio$n_vraag < 30] <- NA
 # Maak koppelkolom aan
 df_regio$varval <- paste0(df_regio$varcode, df_regio$waarde)
 
-df_regio$sorteervariabele <- 1:nrow(df_regio)
-
-write.csv(df_regio, file = paste0(output_name, "_regio_def.csv"), row.names = FALSE)
+# Sla de data op als csv bestand
+write.csv(df_regio, file = paste0(output_name, "_regio.csv"), row.names = FALSE)
 
 
 
@@ -142,24 +162,25 @@ write.csv(df_regio, file = paste0(output_name, "_regio_def.csv"), row.names = FA
 # Zonder crossing, gemeente niveau CI 90% en 95% #
 ##################################################
 
-df_gem_ci95 <- data.frame(varcode = character(0)
-                       , waarde = integer(0)
-                       , label = character(0)
-                       , percentage = integer(0)
-                       , CIlower = integer(0)
-                       , CIupper = integer(0)
-                       , n_unweighted = integer(0)
-                       , gebied = character(0))
+# Moet opgeschoond worden met subfunctie. Teveel code duplication.
 
-df_gem_ci90 <- data.frame(varcode = character(0)
-                          , waarde = integer(0)
-                          , label = character(0)
-                          , percentage = integer(0)
-                          , CIlower = integer(0)
-                          , CIupper = integer(0)
-                          , n_unweighted = integer(0)
-                          , gebied = character(0))
 
+# Bereken het aantal antwoordopties voor alle indicatoren, om te bepalen hoe groot de dataframe moet zijn waar alle data in wordt 
+# opgeslagen. Dit is sneller dan wanneer je in een loop steeds 1 regel aan een dataframe toevoegt.
+# Voor gemeenten is dit het aantal antwoordopties voor alle indicatoren samen keer het aantal gemeenten dat er in de data zit.
+
+aantal_verwachte_rijen <- aantal_variable_labels * length(unique(data$cbs))
+
+# Maak een lege dataframe aan op de resultaten in op te slaan
+df_gem_ci95 = data.frame(matrix(NA, ncol = 8, nrow = aantal_verwachte_rijen))
+df_gem_ci90 = data.frame(matrix(NA, ncol = 8, nrow = aantal_verwachte_rijen))
+
+# Pas de kolomnamen aan
+colnames(df_gem_ci95) <- c("varcode", "waarde", "label", "percentage", "CIlower", "CIupper", "n_unweighted", "gebied")
+colnames(df_gem_ci90) <- c("varcode", "waarde", "label", "percentage", "CIlower", "CIupper", "n_unweighted", "gebied")
+
+# Initialiseer regelnummer op 1, voor het wegschrijven van de uitgerekende data
+regelnummer <- 1
 
 for (gemeente in unique(data$cbs)) {
 
@@ -174,7 +195,7 @@ for (gemeente in unique(data$cbs)) {
     
     if (!all(is.na(data[[varcode]]))){
   
-      varlabels <- attr(data_sub[[varcode]], "labels") # value labels
+      varlabels <- attr(data[[varcode]], "labels") # value labels. # value labels. Gebruik data ipv data_sub, omdat je anders labels mist als een bepaald antwoord niet voorkomt bij de eerste gemeente
   
       # tb <- svytable(formula = ~data_sub[[varcode]] , design = survey_design_sub) # Hiermee mis ik de antwoordopties die niemand heeft gekozen
       tb <- svytable(formula = ~data[[varcode]] , design = survey_design) # Deze bevat populatieaantallen. Prima als je tb alleen voor labels gebruikt en niet de gewogen n per gemeente wil weten
@@ -193,42 +214,39 @@ for (gemeente in unique(data$cbs)) {
         ci_95 <- eval(parse(text = expr_95)) # confidence intervals
         
         # Schrijf info weg naar dataframe
-        idx <- nrow(df_gem_ci95) + 1
+        temp_varcode <- varcode # variabelenaam
+        temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
+        temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+        # temp_n <- round(tb_regio[[j]])  # Populatie n / gewogen n  <= is populatie van hele regio, niet van subset.
+        temp_percentage <- ci_95[[1]] * 100 # Estimate/percentage
+        temp_CIlower <- attr(ci_95, "ci")[1] * 100 # CI lower
+        temp_CIupper <- attr(ci_95, "ci")[2] * 100 # CI upper
+        temp_n_unweighted <- sum(survey_design_sub[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
+        temp_gebied <- gemeente
         
-        df_gem_ci95[idx, 1] <- varcode # variabelenaam
-        df_gem_ci95[idx, 2] <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
-        df_gem_ci95[idx, 3] <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
-        # df_gem_ci95[idx, 4] <- round(tb_regio[[j]])  # Populatie n / gewogen n 
-        df_gem_ci95[idx, 4] <- ci_95[[1]] # vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci95[idx, 5] <- attr(ci_95, "ci")[1] # vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci95[idx, 6] <- attr(ci_95, "ci")[2]# vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci95[idx, 7] <- sum(survey_design_sub[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
-        df_gem_ci95[idx, 8] <- gemeente
+        # Schrijf data weg naar dataframe
+        df_gem_ci95[regelnummer,] <- c(temp_varcode, temp_waarde, temp_label, temp_percentage, temp_CIlower, temp_CIupper, temp_n_unweighted, temp_gebied)
+        
         
         ## 90%
         string_90 <- "svyciprop(~I({varcode}=={val}), survey_design_sub, method='xlogit', na.rm=TRUE, level = 0.90)"
         expr_90 <- glue(string_90)
         ci_90 <- eval(parse(text = expr_90)) # confidence intervals
         
+        # Alleen betrouwbaarheidsintervallen hoeven opnieuw te worden uitgerekend, de rest blijft hetzelfde
+        temp_CIlower <- attr(ci_90, "ci")[1] * 100 # CI lower
+        temp_CIupper <- attr(ci_90, "ci")[2] * 100 # CI upper
         
-        df_gem_ci90[idx, 1] <- varcode # variabelenaam
-        df_gem_ci90[idx, 2] <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
-        df_gem_ci90[idx, 3] <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
-        # df_gem_ci90[idx, 4] <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset. 
-        df_gem_ci90[idx, 4] <- ci_90[[1]] # vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci90[idx, 5] <- attr(ci_90, "ci")[1] # vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci90[idx, 6] <- attr(ci_90, "ci")[2]# vermenigvuldigd met 100 om percentage te krijgen ipv proportie
-        df_gem_ci90[idx, 7] <- sum(survey_design_sub[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
-        df_gem_ci90[idx, 8] <- gemeente
+        # Schrijf data weg naar dataframe
+        df_gem_ci90[regelnummer,] <- c(temp_varcode, temp_waarde, temp_label, temp_percentage, temp_CIlower, temp_CIupper, temp_n_unweighted, temp_gebied)
         
         
-        print(idx)
-        print(gemeente)
-        print(varcode)
-  
+        # Print huidige regelnummer om idee te krijgen hoe lang script nog zal runnen
+        print(paste0(regelnummer, " van ", aantal_verwachte_rijen))
         
-        # write.csv(df_gem_ci95, file = paste0(output_name, "_gem_ci95_tussenbestand.csv"), row.names = FALSE)
-        # write.csv(df_gem_ci90, file = paste0(output_name, "_gem_ci90_tussenbestand.csv"),  row.names = FALSE)
+        # Hoog regelnummer met 1 op om de volgende regel in de dataframe te vullen met de volgende indicator/antwoordoptie
+        regelnummer <- regelnummer + 1
+
       }
     }
   }  
@@ -240,7 +258,6 @@ df_gem_ci95 <- df_gem_ci95 %>%
   mutate(n_vraag = sum(n_unweighted)) %>%
   ungroup()  
 
-# Geen zin in functie schrijven...
 # Zelfde voor confidence level 90%
 df_gem_ci90 <- df_gem_ci90 %>%
   group_by(varcode, gebied) %>%
@@ -266,11 +283,14 @@ df_gem_ci90$cbsstr <- as.character(df_gem_ci90$gebied)
 df_gem_ci95$varval <- paste0(df_gem_ci95$varcode, df_gem_ci95$waarde)
 df_gem_ci90$varval <- paste0(df_gem_ci90$varcode, df_gem_ci90$waarde)
 
-write.csv(df_gem_ci95, paste0(output_name, "_gem_ci95_tussenbestand_full.csv"),  row.names = FALSE)
-write.csv(df_gem_ci90, paste0(output_name, "_gem_ci90_tussenbestand_full.csv"),  row.names = FALSE)
+write.csv(df_gem_ci95, paste0(output_name, "_gem_ci95.csv"),  row.names = FALSE)
+write.csv(df_gem_ci90, paste0(output_name, "_gem_ci90.csv"),  row.names = FALSE)
 
 
 ## Aan de gemeentetabel (ci 95%) wil ik de estimates, ci lowers en ci uppers van de regiotabel plakken
+
+# # Lees df_regio in, als deze niet in de R omgeving staat
+# df_regio <- read.csv(paste0(output_name, "_regio.csv"))
 
 # Koppel aan regio
 gem_vs_regio <- dplyr::left_join(df_gem_ci95, df_regio, by = "varval", suffix = c("_gem", "_regio"))
@@ -297,8 +317,8 @@ for (i in 1:nrow(gem_vs_regio) ){
 gem_vs_regio$Sign[gem_vs_regio$n_vraag_gem < 30] <- "n<30"
 
 # Afspraak: Als regio en gemeente allebei een estimate van 1 (100%) of 0 (0%) hebben, dan significantie naar "Niet significant" zetten, bij andere percentages niet.
-gem_vs_regio$Sign[gem_vs_regio$percentage_gem >= 0.995 & gem_vs_regio$percentage_regio >= 0.995] <- "0"
-gem_vs_regio$Sign[gem_vs_regio$percentage_gem < 0.005 & gem_vs_regio$percentage_regio < 0.005] <- "0"
+gem_vs_regio$Sign[gem_vs_regio$percentage_gem >= 99.5 & gem_vs_regio$percentage_regio >= 99.5] <- "0"
+gem_vs_regio$Sign[gem_vs_regio$percentage_gem < 0.5 & gem_vs_regio$percentage_regio < 0.5] <- "0"
 
 write.csv(gem_vs_regio, paste0(output_name, "_gem_vs_regio_def.csv"),  row.names = FALSE)
 
@@ -307,17 +327,21 @@ write.csv(gem_vs_regio, paste0(output_name, "_gem_vs_regio_def.csv"),  row.names
 # Zonder crossing, wijk niveau #
 ################################
 
-# Vrijwel identiek aan gemeenteniveau, maar ik ben te lui om een subfunctie te schrijven
+# Vrijwel identiek aan gemeenteniveau. In de toekomst omzetten naar subfunctie.
 
-df_wijk <- data.frame(varcode = character(0)
-                     , waarde = integer(0)
-                     , label = character(0)
-                     , percentage = integer(0)
-                     , CIlower = integer(0)
-                     , CIupper = integer(0)
-                     , n_unweighted = integer(0)
-                     , gebied = character(0))
 
+# Bereken het aantal antwoordopties voor alle indicatoren, om te bepalen hoe groot de dataframe moet zijn waar alle data in wordt 
+# opgeslagen. Dit is sneller dan wanneer je in een loop steeds 1 regel aan een dataframe toevoegt.
+# Voor wijken is dit het aantal antwoordopties voor alle indicatoren samen keer het aantal wijken dat er in de data zit.
+
+aantal_verwachte_rijen <- aantal_variable_labels * length(unique(data$wijk))
+
+
+df_wijk = data.frame(matrix(NA, ncol = 8, nrow = aantal_verwachte_rijen))
+colnames(df_wijk) <- c("varcode", "waarde", "label", "percentage", "CIlower", "CIupper", "n_unweighted", "gebied")
+
+# Initialiseer regelnummer op 1, voor het wegschrijven van de uitgerekende data
+regelnummer <- 1
 
 for (wijk in unique(data$wijk)){
   
@@ -332,7 +356,7 @@ for (wijk in unique(data$wijk)){
     
     if (!all(is.na(data_sub[[varcode]]))){
     
-      varlabels <- attr(data[[varcode]], "labels") # value labels
+      varlabels <- attr(data[[varcode]], "labels") # value labels. Gebruik data ipv data_sub, omdat je anders labels mist als een bepaald antwoord niet voorkomt bij de eerste wijk.
       
       tb <- svytable(formula = ~data[[varcode]] , design = survey_design) # Deze bevat populatieaantallen. Prima als je tb alleen voor labels gebruikt en niet de gewogen n per gemeente wil weten
       
@@ -347,34 +371,30 @@ for (wijk in unique(data$wijk)){
         expr <- glue(string)
         ci <- eval(parse(text = expr)) # confidence intervals
         
-        # Schrijf info weg naar dataframe
-        idx <- nrow(df_wijk) + 1
-        df_wijk[idx, 1] <- varcode # variabelenaam
-        df_wijk[idx, 2] <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
-        df_wijk[idx, 3] <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
-        # df_wijk[idx, 4] <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset. 
-        df_wijk[idx, 4] <- ci[[1]] # Estimate/percentage
-        df_wijk[idx, 5] <- attr(ci, "ci")[1] # CI lower
-        df_wijk[idx, 6] <- attr(ci, "ci")[2] # CI upper
-        df_wijk[idx, 7] <- sum(survey_design_sub[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
-        df_wijk[idx, 8] <- wijk
+        ## Schrijf info weg naar dataframe
+        temp_varcode <- varcode # variabelenaam
+        temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
+        temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+        # df_wijk[idx, 4] <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset.
+        temp_percentage <- ci[[1]] # Estimate/percentage
+        temp_CIlower <- attr(ci, "ci")[1] # CI lower
+        temp_CIupper <- attr(ci, "ci")[2] # CI upper
+        temp_n_unweighted <- sum(survey_design_sub[["variables"]][varcode]  == as.integer(names(tb)[j]), na.rm = TRUE) # sample n / ongewogen n
+        temp_gebied <- wijk
         
-        print(idx)
-        print(wijk)
-        print(varcode)
+        # Schrijf data weg naar dataframe
+        df_wijk[regelnummer,] <- c(temp_varcode, temp_waarde, temp_label, temp_percentage, temp_CIlower, temp_CIupper, temp_n_unweighted, temp_gebied)
         
+        # Print huidige regelnummer om idee te krijgen hoe lang script nog zal runnen
+        print(paste0(regelnummer, " van ", aantal_verwachte_rijen))
+        
+        # Hoog regelnummer met 1 op om de volgende regel in de dataframe te vullen met de volgende indicator/antwoordoptie
+        regelnummer <- regelnummer + 1
         
       }
     }  
   }
-  write.csv(df_wijk, file = paste0(output_name, "_wijk_tussenbestand.csv"),  row.names = FALSE)
-  
-  }
-
-# Inlezen als sessie bovenstaande niet in 1 dag gedraaid is
-# df_wijk <- read.csv("output tabel 1/JM_wijk_Jolien_20191009.csv", header=TRUE)
-# df_gem_ci90 <- read.csv("JM_gem_ci90_20191018.csv", header=TRUE)
-
+}
 
 
 # Tel aantal geldige antwoorden per vraag op.
@@ -392,7 +412,7 @@ df_wijk$CIupper[df_wijk$n_vraag < 30] <- NA
 df_wijk$varval <- paste0(df_wijk$varcode, df_wijk$waarde)
 
 
-write.csv(df_wijk, file = paste0(output_name, "_wijk_tussenbestand_full.csv"), row.names = FALSE)
+write.csv(df_wijk, file = paste0(output_name, "_wijk_ci90.csv"), row.names = FALSE)
 
 
 # Koppeltabel om gemeenten bij wijken te krijgen in df_wijk
@@ -431,8 +451,8 @@ for (i in 1:nrow(wijk_vs_gem) ){
 wijk_vs_gem$Sign[wijk_vs_gem$n_vraag_wijk < 30] <- "n<30"
 
 # Afspraak: Als regio en gemeente allebei een estimate van 1 (100%) of 0 (0%) hebben, dan significantie naar "Niet significant" zetten, bij andere percentages niet.
-wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk >= 0.995 & wijk_vs_gem$percentage_gem >= 0.995] <- "0"
-wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk < 0.005 & wijk_vs_gem$percentage_gem < 0.005] <- "0"
+wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk >= 99.5 & wijk_vs_gem$percentage_gem >= 99.5] <- "0"
+wijk_vs_gem$Sign[wijk_vs_gem$percentage_wijk < 0.5 & wijk_vs_gem$percentage_gem < 0.5] <- "0"
 
 
 write.csv(wijk_vs_gem, file = paste0(output_name, "wijk_vs_gem_def.csv"), row.names = FALSE)
