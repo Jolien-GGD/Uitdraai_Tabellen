@@ -139,6 +139,15 @@ for (varcode in var_df$V1){
   }  
 }
 
+# Zet naar numeric
+df_regio$waarde <- as.numeric(df_regio$waarde)
+df_regio$n <- as.numeric(df_regio$n)
+df_regio$percentage <- as.numeric(df_regio$percentage)
+df_regio$CIlower <- as.numeric(df_regio$CIlower)
+df_regio$CIupper <- as.numeric(df_regio$CIupper)
+df_regio$n_unweighted <- as.numeric(df_regio$n_unweighted)
+
+
 # Tel aantal geldige antwoorden per vraag op.
 df_regio <- df_regio %>%
   group_by(varcode) %>%
@@ -251,6 +260,21 @@ for (gemeente in unique(data$cbs)) {
     }
   }  
 }
+
+# Zet naar numeric
+df_gem_ci95$waarde <- as.numeric(df_gem_ci95$waarde)
+df_gem_ci95$percentage <- as.numeric(df_gem_ci95$percentage)
+df_gem_ci95$CIlower <- as.numeric(df_gem_ci95$CIlower)
+df_gem_ci95$CIupper <- as.numeric(df_gem_ci95$CIupper)
+df_gem_ci95$n_unweighted <- as.numeric(df_gem_ci95$n_unweighted)
+
+# Zet naar numeric
+df_gem_ci90$waarde <- as.numeric(df_gem_ci90$waarde)
+df_gem_ci90$percentage <- as.numeric(df_gem_ci90$percentage)
+df_gem_ci90$CIlower <- as.numeric(df_gem_ci90$CIlower)
+df_gem_ci90$CIupper <- as.numeric(df_gem_ci90$CIupper)
+df_gem_ci90$n_unweighted <- as.numeric(df_gem_ci90$n_unweighted)
+
 
 # Tel aantal geldige antwoorden per vraag op.
 df_gem_ci95 <- df_gem_ci95 %>%
@@ -395,6 +419,13 @@ for (wijk in unique(data$wijk)){
     }  
   }
 }
+
+# Zet naar numeric
+df_wijk$waarde <- as.numeric(df_wijk$waarde)
+df_wijk$percentage <- as.numeric(df_wijk$percentage)
+df_wijk$CIlower <- as.numeric(df_wijk$CIlower)
+df_wijk$CIupper <- as.numeric(df_wijk$CIupper)
+df_wijk$n_unweighted <- as.numeric(df_wijk$n_unweighted)
 
 
 # Tel aantal geldige antwoorden per vraag op.
