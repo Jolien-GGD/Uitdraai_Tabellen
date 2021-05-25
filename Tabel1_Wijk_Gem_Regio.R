@@ -120,6 +120,12 @@ for (varcode in var_df$V1){
       temp_varcode <- varcode # variabelenaam
       temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
       temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+      
+      # Als variable label ontbreekt, zet dan naar lege string
+      if (length(temp_label) == 0) {
+        temp_label = ""
+      } 
+      
       temp_n <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset. 
       temp_percentage <- ci[[1]] * 100 # Estimate/percentage
       temp_CIlower <- attr(ci, "ci")[1] * 100 # CI lower
@@ -226,6 +232,12 @@ for (gemeente in unique(data$cbs)) {
         temp_varcode <- varcode # variabelenaam
         temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
         temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+        
+        # Als variable label ontbreekt, zet dan naar lege string
+        if (length(temp_label) == 0) {
+          temp_label = ""
+        } 
+        
         # temp_n <- round(tb_regio[[j]])  # Populatie n / gewogen n  <= is populatie van hele regio, niet van subset.
         temp_percentage <- ci_95[[1]] * 100 # Estimate/percentage
         temp_CIlower <- attr(ci_95, "ci")[1] * 100 # CI lower
@@ -399,6 +411,13 @@ for (wijk in unique(data$wijk)){
         temp_varcode <- varcode # variabelenaam
         temp_waarde <- names(tb)[j] # numerieke waarde van huidige antwoordoptie
         temp_label <- names(varlabels)[varlabels == as.numeric(names(tb)[j])] # tekstlabel van huidige antwoordoptie
+        
+        # Als variable label ontbreekt, zet dan naar lege string
+        if (length(temp_label) == 0) {
+          temp_label = ""
+        } 
+        
+        
         # df_wijk[idx, 4] <- round(tb[[j]])  # Populatie n / gewogen n <= is populatie van hele regio, niet van subset.
         temp_percentage <- ci[[1]] # Estimate/percentage
         temp_CIlower <- attr(ci, "ci")[1] # CI lower
