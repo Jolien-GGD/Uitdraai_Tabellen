@@ -36,7 +36,7 @@ source('subfunctie_significantie.R')
 #########################
 
 # Basisnaam voor output bestand
-output_name <- "output/OM_2020_HvB_tabel1"
+output_name <- "data/output/OM_2020_HvB_tabel1"
 
 # Kies 1 varlijst
 # varlijst <- "data/aangeleverd/varlijst_VM_regio.csv"
@@ -359,7 +359,7 @@ write.xlsx(wijk_vs_gem, file = paste0(output_name, "_wijk90_vs_gem95.xlsx"))
 ## Foei, weer veel code herhalingen. Later opschonen?
 
 # Basisnaam voor outputbestand
-output_name <- "output/OM_2020_tabel1"
+output_name <- "data/output/OM_2020_tabel1"
 
 # Open databestand (en sla evt op als Rdata)
 # data_monitor <- read_spss("data/aangeleverd/Databestand GM2020 Landelijk met ZeeBra-indicatoren.sav")
